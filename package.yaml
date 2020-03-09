@@ -5,6 +5,7 @@ license:             MIT
 author:              "Chris Maher"
 maintainer:          "chrismaher37@gmail.com"
 copyright:           "2019 Chris Maher"
+data-files:          "data/templates/*.sql"
 
 extra-source-files:
 - README.md

@@ -1,21 +1,22 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Redshift
     ( queryRunner
-    , selectSchemas
-    , selectTables
+    , showSchemas
+    , showTables
     ) where
 
 import           Control.Monad.Reader
-import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.ByteString as B
 import qualified Database.PostgreSQL.Simple as SQL
 import           Database.PostgreSQL.Simple.ToField
-import           Database.PostgreSQL.Simple.FromRow
+import           Database.PostgreSQL.Simple.Types (Query (..))
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
+import           System.FilePath (joinPath)
 
 import Config
+import Paths_redshift_cli (getDataFileName)
 
-type Name = String
+type Object = String
 type Prefix = String
 
 type Connection = ReaderT SQL.Connection
@@ -33,22 +34,20 @@ unpack (SQL.Only col) = T.unpack col
 toIdentifier :: String -> Action
 toIdentifier = EscapeIdentifier . encodeUtf8 . T.pack
 
-selectSchemas :: Prefix -> Connection IO [Row]
-selectSchemas prefix = do
-    db <- ask
-    liftIO $ (fmap . fmap) SchemaRow $ SQL.query db q [p]
+readQuery :: FilePath -> IO Query
+readQuery fname = getDataFileName path >>= readQuery'
     where
-        p = prefix ++ "%"
-        q = "SELECT nspname AS name, nspowner AS owner \
-             \ FROM pg_namespace \
-             \ WHERE nspowner <> 1 AND nspname LIKE ? \
-             \ ORDER BY nspname"
+        path = joinPath ["data/templates", fname]
+        readQuery' = fmap Query . B.readFile
 
-selectTables :: Name -> Prefix -> Connection IO [Row]
-selectTables schema prefix = do
+showSchemas :: Prefix -> Connection IO [Row]
+showSchemas p = do
     db <- ask
+    q <- liftIO $ readQuery "showSchemas.sql"
+    liftIO $ (fmap . fmap) SchemaRow $ SQL.query db q [p ++ "%"]
+
+showTables :: Object -> Prefix -> Connection IO [Row]
+showTables schema prefix = do
+    db <- ask
+    q <- liftIO $ readQuery "showTables.sql"
     liftIO $ (fmap . fmap) TableRow $ SQL.query db q [schema]
-    where
-        q = "SELECT schemaname, tablename, tableowner \
-             \ FROM pg_tables \
-             \ WHERE schemaname = ?"

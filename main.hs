@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import CLI
@@ -11,5 +9,5 @@ main = do
     opts <- optParse
     let run f = runner f >>= mapM_ print
     case opts of
-        ShowSchemas p -> run (selectSchemas p)
-        ShowTables s p -> run (selectTables s p)
+        ShowSchemas p -> run (showSchemas p)
+        ShowTables s p -> run (showTables s p)

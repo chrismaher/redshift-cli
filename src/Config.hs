@@ -65,23 +65,19 @@ pgParser = connectInfo <$> term <*> (word16 <$> port') <*> term <*> term <*> val
 parsePGPass :: String -> Either ConfigError [ConnectInfo]
 parsePGPass str =
     case parse pgPassFile "" str of
-        Left e -> Left $ ConfigError "Could not parse credentials from .pgpass"
+        Left _ -> Left $ ConfigError "Could not parse credentials from .pgpass"
         Right x -> Right x
     where
         pgPassFile = endBy pgParser (char '\n')
 
 parseConfig :: String -> ExceptT ConfigError IO ConnectInfo
 parseConfig str = withFailure $ do
-    return $ decodeEither'' bstr
-    where
-        bstr = packStr'' str
-        decodeEither'' f = do
-            case Y.decodeEither' f of
-                Left e -> Left $ ConfigError "Could not parse .redshift/config.yaml"
-                Right x -> Right x
+    return $ case Y.decodeEither' (packStr'' str) of
+            Left _ -> Left $ ConfigError "Could not parse .redshift/config.yaml"
+            Right x -> Right x
 
-filtPass :: ConnectInfo -> [ConnectInfo] -> Either ConfigError ConnectInfo
-filtPass pass passes =
+filterPass :: ConnectInfo -> [ConnectInfo] -> Either ConfigError ConnectInfo
+filterPass pass passes =
     let user'    = ((==) $ connectUser pass) . connectUser
         dbname'  = ((==) $ connectDatabase pass) . connectDatabase
         filtered = filter (liftM2 (&&) user' dbname') passes
@@ -95,4 +91,4 @@ filterPGPass = either E.throw return <=< runExceptT $ do
     pgpass <- (liftIO (fullPath ".pgpass") >>= readFile')
     pass <- parseConfig config
     pg <- either throwError return $ parsePGPass pgpass
-    either throwError return $ filtPass pass pg
+    either throwError return $ filterPass pass pg
